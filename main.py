@@ -33,40 +33,7 @@ async def post_daily_puzzle():
         puzzles_channel = get(guild.channels, name="puzzles")  # Find the 'puzzles' channel in the guild
 
         if puzzles_channel:
-            try:
-                # Step 1: Get the daily puzzle
-                response = requests.get("https://lichess.org/api/puzzle/daily")
-                data = response.json()
-
-                # Step 2: Extract the puzzle information
-                pgn = data['game']['pgn']
-                moves = data['puzzle']['solution']
-
-                # Step 3: Parse the PGN and display the board position
-                pgn_io = StringIO(pgn)
-                game = chess.pgn.read_game(pgn_io)
-                board = game.board()
-
-                # Apply the moves from the PGN to reach the puzzle position
-                for move in game.mainline_moves():
-                    board.push(move)
-
-                # Determine whose turn it is
-                turn = "White" if board.turn else "Black"
-
-                # Generate the board as an SVG
-                svg_data = chess.svg.board(board=board, flipped=not board.turn)
-
-                # Convert the SVG to PNG
-                png_data = BytesIO()
-                cairosvg.svg2png(bytestring=svg_data, write_to=png_data)
-                png_data.seek(0)
-
-                # Send the PNG image and PGN to the puzzles channel
-                await puzzles_channel.send(file=discord.File(png_data, "daily_puzzle.png"))
-                await puzzles_channel.send(f"It is {turn}'s move for today's puzzle!")
-            except Exception as e:
-                print(f"Failed to post puzzle in guild {guild.name}: {e}")
+            await fetch_and_post_puzzle(puzzles_channel)
         else:
             print(f"No 'puzzles' channel found in guild {guild.name}. Skipping.")
 
@@ -79,42 +46,53 @@ async def daily_puzzle(ctx):
     puzzles_channel = get(ctx.guild.channels, name="puzzles")  # Find the 'puzzles' channel in the current guild
 
     if puzzles_channel:
-        try:
-            # Step 1: Get the daily puzzle
-            response = requests.get("https://lichess.org/api/puzzle/daily")
-            data = response.json()
-
-            # Step 2: Extract the puzzle information
-            pgn = data['game']['pgn']
-            moves = data['puzzle']['solution']
-
-            # Step 3: Parse the PGN and display the board position
-            pgn_io = StringIO(pgn)
-            game = chess.pgn.read_game(pgn_io)
-            board = game.board()
-
-            # Apply the moves from the PGN to reach the puzzle position
-            for move in game.mainline_moves():
-                board.push(move)
-
-            # Determine whose turn it is
-            turn = "White" if board.turn else "Black"
-
-            # Generate the board as an SVG
-            svg_data = chess.svg.board(board=board, flipped=not board.turn)
-
-            # Convert the SVG to PNG
-            png_data = BytesIO()
-            cairosvg.svg2png(bytestring=svg_data, write_to=png_data)
-            png_data.seek(0)
-
-            # Send the PNG image and PGN to the puzzles channel
-            await puzzles_channel.send(file=discord.File(png_data, "daily_puzzle.png"))
-            await puzzles_channel.send(f"It is {turn}'s move for today's puzzle!")
-        except Exception as e:
-            await ctx.send(f"Failed to fetch or post the puzzle: {e}")
+        await fetch_and_post_puzzle(puzzles_channel)
     else:
         await ctx.send("No 'puzzles' channel found in this server. Please create one.")
+
+async def fetch_and_post_puzzle(channel):
+    """
+    Fetches the daily puzzle from Lichess and posts it to the specified channel.
+
+    Args:
+        channel (discord.TextChannel): The channel where the puzzle will be posted.
+    """
+    try:
+        # Step 1: Get the daily puzzle
+        response = requests.get("https://lichess.org/api/puzzle/daily")
+        data = response.json()
+
+        # Step 2: Extract the puzzle information
+        pgn = data['game']['pgn']
+        moves = data['puzzle']['solution']
+
+        # Step 3: Parse the PGN and display the board position
+        pgn_io = StringIO(pgn)
+        game = chess.pgn.read_game(pgn_io)
+        board = game.board()
+
+        # Apply the moves from the PGN to reach the puzzle position
+        for move in game.mainline_moves():
+            board.push(move)
+
+        # Determine whose turn it is
+        turn = "White" if board.turn else "Black"
+
+        # Generate the board as an SVG
+        svg_data = chess.svg.board(board=board, flipped=not board.turn)
+
+        # Convert the SVG to PNG
+        png_data = BytesIO()
+        cairosvg.svg2png(bytestring=svg_data, write_to=png_data)
+        png_data.seek(0)
+
+        # Send the PNG image and PGN to the channel
+        await channel.send(file=discord.File(png_data, "daily_puzzle.png"))
+        await channel.send(f"It is {turn}'s move for today's puzzle!")
+    except Exception as e:
+        print(f"Failed to fetch or post the puzzle: {e}")
+        if isinstance(channel, discord.TextChannel):
+            await channel.send(f"An error occurred while fetching the puzzle: {e}")
 
 # Run the bot
 bot.run(TOKEN)

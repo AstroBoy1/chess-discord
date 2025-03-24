@@ -1,0 +1,6 @@
+discord
+dotenv
+requests
+python-chess
+Ipython
+cairosvg
